@@ -302,16 +302,26 @@ def api_experiment():
     """Runs multi-file benchmark matrix across sample datasets."""
     try:
         results = []
-        sample_dir = os.path.join(os.path.dirname(__file__), "sample_data")
-        sample_files = glob.glob(os.path.join(sample_dir, "*"))
+        sample_dir = os.path.join(BASE_DIR, "sample_data")
 
-        for filepath in sorted(sample_files):
-            fname = os.path.basename(filepath)
-            with open(filepath, "rb") as f:
-                content = f.read()
-            analysis = generate_full_analysis(content, fname)
-            analysis["file_type"] = detect_file_type(fname)
-            results.append(analysis)
+        for fname in sorted(os.listdir(sample_dir)):
+            filepath = os.path.join(sample_dir, fname)
+
+            # Skip folders (e.g. __pycache__), compiled files and hidden files
+            if not os.path.isfile(filepath):
+                continue
+            if fname.endswith((".pyc", ".pyo")) or fname.startswith("."):
+                continue
+
+            try:
+                with open(filepath, "rb") as f:
+                    content = f.read()
+                analysis = generate_full_analysis(content, fname)
+                analysis["file_type"] = detect_file_type(fname)
+                results.append(analysis)
+            except Exception as file_err:
+                # One bad file (e.g. the empty-file edge case) shouldn't break the whole matrix
+                print(f"Skipping {fname}: {file_err}")
 
         return jsonify({"success": True, "benchmark_results": results})
     except Exception as e:
